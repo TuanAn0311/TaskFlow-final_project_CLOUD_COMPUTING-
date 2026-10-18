@@ -23,5 +23,7 @@ ALTER TABLE task_assignments
   VALIDATE CONSTRAINT chk_revoked_fields_consistency;
 
 ALTER TABLE task_assignments
-  DROP CONSTRAINT chk_completed_at,
-  DROP CONSTRAINT chk_revoked_fields;
+  DROP CONSTRAINT IF EXISTS chk_completed_at,
+  DROP CONSTRAINT IF EXISTS chk_revoked_fields,
+  DROP CONSTRAINT IF EXISTS chk_assignment_completion,
+  DROP CONSTRAINT IF EXISTS chk_assignment_revocation;

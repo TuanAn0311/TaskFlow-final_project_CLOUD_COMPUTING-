@@ -1,6 +1,6 @@
 # Hướng dẫn sử dụng TaskFlow
 
-Tài liệu này hướng dẫn từ lúc chuẩn bị máy, khởi chạy TaskFlow đến khi tạo và theo dõi công việc. TaskFlow có giao diện web và ứng dụng di động; cả hai cùng sử dụng một API và cơ sở dữ liệu.
+Tài liệu này hướng dẫn từ lúc chuẩn bị máy, khởi chạy TaskFlow trên máy cá nhân, đưa API/web lên Render, cấu hình lưu file đến khi đăng nhập và sử dụng công việc. TaskFlow có giao diện web và ứng dụng di động; cả hai cùng sử dụng một API và cơ sở dữ liệu.
 
 ## 1. TaskFlow dùng để làm gì?
 
@@ -67,7 +67,7 @@ TaskFlow lưu file trong một **bucket riêng tư của Supabase Storage**; kh�
    SUPABASE_STORAGE_BUCKET=taskflow-files
    ```
 
-4. Chạy migration ở bước tiếp theo rồi khởi động lại backend. Khi deploy theo Render Blueprint, nhập `SUPABASE_URL` và `SUPABASE_SERVICE_ROLE_KEY` vào phần biến môi trường của API; bucket `taskflow-files` phải được tạo trước.
+4. Chạy migration ở bước tiếp theo rồi khởi động lại backend. Khi deploy theo Render Blueprint, nhập `SUPABASE_URL` và `SUPABASE_SERVICE_ROLE_KEY` vào phần biến môi trường của API; bucket `taskflow-files` phải được tạo trước. Backend gọi Supabase Storage REST API nên không cần cài thêm SDK Supabase.
 
 Gói miễn phí của nhà cung cấp có giới hạn và điều kiện riêng, có thể thay đổi; kiểm tra quota, giới hạn kích thước và chính sách lưu trữ hiện hành trong Supabase trước khi dùng cho dữ liệu quan trọng. File hỗ trợ: PDF, Word, Excel, PowerPoint, TXT, PNG và JPG; tối đa 10 MB/file, tối đa 5 file mỗi lần tải lên. File được mở bằng đường dẫn có chữ ký, hết hạn sau 2 phút.
 
@@ -214,14 +214,166 @@ Trong chi tiết công việc, nhập nội dung vào **Comments** rồi nhấn 
 
 Mở **Team** để tìm thành viên theo tên/email hoặc lọc tài khoản đang hoạt động/đã vô hiệu hóa. Nhấn **Deactivate** để vô hiệu hóa, hoặc **Reactivate** để kích hoạt lại. Quản trị viên không thể tự vô hiệu hóa mình hoặc vô hiệu hóa quản trị viên đang hoạt động cuối cùng.
 
-## 6. Quyền truy cập cần nhớ
+## 6. Đưa TaskFlow lên Render
+
+Phần này triển khai **API, PostgreSQL và web** bằng Blueprint có sẵn trong `render.yaml`. Cần có tài khoản GitHub, Render và Supabase. Tên nút trong giao diện nhà cung cấp có thể thay đổi theo thời gian.
+
+### Trước khi bắt đầu
+
+- Hoàn tất các thay đổi cần deploy và kiểm tra chúng trong Git. Nếu repository có thư mục `mobile/` với Git riêng, lưu ý các thay đổi mobile cần được push riêng; Render Blueprint hiện chỉ triển khai API và web.
+- Không đưa `backend/.env`, mật khẩu, JWT secret, database URL hoặc Supabase service-role key lên GitHub. Từ thư mục gốc, kiểm tra `git status --short`; xác nhận `backend/.env` không xuất hiện như file mới hoặc file được stage. Nếu file đó đã từng được commit, `.gitignore` không đủ để xóa nó khỏi lịch sử—hãy thay các key bị lộ và xử lý lịch sử repo trước khi public.
+- Có thể kiểm tra trước build web (thay URL ví dụ bằng URL API Render sau khi được tạo):
+
+  ```powershell
+  cd web
+  npm ci
+  $env:VITE_API_URL = "https://api.example.com"
+  npm run build
+  Remove-Item Env:VITE_API_URL
+  cd ..
+  ```
+
+### Bước 1: Push mã nguồn lên GitHub
+
+1. Nếu đã có repository GitHub, push các file dự án đã kiểm tra lên nhánh sẽ deploy. Nếu chưa có, tạo repository mới trên GitHub, không thêm file `.env` vào đó, rồi kết nối thư mục gốc với repository theo hướng dẫn GitHub.
+2. Tại PowerShell ở thư mục gốc, kiểm tra nhánh và các file đang thay đổi:
+
+   ```powershell
+   git status --short
+   git branch --show-current
+   git remote -v
+   git check-ignore backend\.env
+   ```
+
+   `git check-ignore` cần báo rằng `backend/.env` bị ignore. Nếu `git remote -v` không hiện repository GitHub, trước tiên kết nối repo với GitHub theo hướng dẫn GitHub; không tự thay remote nếu repository đã được thiết lập.
+
+3. Stage các thay đổi triển khai API/web, migration và tài liệu. Ví dụ nếu các thay đổi trong những thư mục này đều thuộc phiên bản bạn muốn đưa lên:
+
+   ```powershell
+   git add README.md render.yaml backend database docs web
+   git status --short
+   git diff --cached --name-only
+   ```
+
+   Xem danh sách file đã stage. Nếu thấy `backend/.env`, mật khẩu, file build hoặc thay đổi không định deploy, **dừng lại** và bỏ file đó khỏi danh sách stage trước khi tiếp tục. Không stage thư mục `mobile` ở repo gốc nếu Git báo đó là repository nhúng/submodule. Nếu có thay đổi riêng không liên quan, stage từng file cần thiết thay vì cả thư mục.
+
+4. Nếu danh sách stage đã đúng, commit và push nhánh hiện tại:
+
+   ```powershell
+   git commit -m "Add task documents and completion reports"
+   $branch = git branch --show-current
+   git push -u origin $branch
+   ```
+
+   Nếu Git yêu cầu đăng nhập, hoàn tất xác thực GitHub theo hướng dẫn của Git. Không dán token hoặc mật khẩu vào lệnh/README.
+
+5. Mở repo trên GitHub để xác nhận các file như `render.yaml`, `backend/package.json`, `database/migrations/010_create_task_documents_and_completion_reports.sql` và `web/package.json` đã có trên nhánh vừa push.
+6. Nếu Git báo `mobile` là repository nhúng/submodule, không xóa hoặc thay đổi cấu hình đó chỉ để deploy web. Có thể triển khai backend/web trước; nếu cần bản mobile, push repository mobile riêng và build bằng Expo/EAS sau.
+
+### Bước 2: Tạo tài nguyên Render từ Blueprint
+
+1. Đăng nhập Render, chọn **New → Blueprint** (hoặc mục tạo Blueprint tương đương).
+2. Kết nối GitHub nếu được yêu cầu, chọn repository TaskFlow và nhánh vừa push.
+3. Render đọc `render.yaml` và hiển thị ba tài nguyên: PostgreSQL `taskflow-db`, API `taskflow-api` và static site `taskflow-web`. Kiểm tra tên, vùng và giá/giới hạn của các gói trước khi xác nhận **Apply**.
+4. Chờ Render tạo các tài nguyên và chạy deploy. Blueprint tự nối database với API, tạo `JWT_SECRET`, và nối URL web/API cho các cấu hình cần thiết.
+5. Blueprint đánh dấu `SUPABASE_URL` và `SUPABASE_SERVICE_ROLE_KEY` là giá trị nhập thủ công. Nếu Render yêu cầu nhập ngay khi tạo Blueprint, có thể nhập ở bước cấu hình environment sau đây; nếu chưa có Supabase, tạo tài nguyên trước nhưng chưa thể upload/xem file cho đến khi khai báo đủ hai biến này.
+
+Render free có thể có giới hạn thời gian chạy, dung lượng, thời hạn database và backup; những chính sách này có thể thay đổi. Xem thông tin plan hiện tại trên Render trước khi dùng với dữ liệu thật.
+
+### Bước 3: Tạo bucket Supabase riêng tư
+
+1. Tạo project Supabase.
+2. Trong **Storage**, tạo bucket tên chính xác `taskflow-files` và giữ ở chế độ **Private**. Không bật public access.
+3. Mở phần API/project settings của Supabase, lấy **Project URL** và **service_role key**.
+4. Trong Render, mở dịch vụ `taskflow-api` → **Environment**. Thêm/cập nhật:
+   - `SUPABASE_URL`: Project URL, ví dụ `https://your-project.supabase.co`.
+   - `SUPABASE_SERVICE_ROLE_KEY`: service-role key bí mật.
+   - `SUPABASE_STORAGE_BUCKET`: `taskflow-files` (Blueprint đặt sẵn giá trị này).
+5. Lưu thay đổi để Render khởi động lại/deploy API.
+
+Service-role key có quyền cao: chỉ lưu trong biến môi trường của API trên Render. Không đưa key vào GitHub, `web/.env`, `mobile/.env`, mã trình duyệt, ứng dụng mobile, ảnh chụp màn hình hoặc tin nhắn. Kiểm tra quota và giới hạn của Supabase; không giả định gói miễn phí là không giới hạn hoặc phù hợp để lưu trữ lâu dài.
+
+### Bước 4: Chạy migration trên database Render
+
+Migration cần chạy vào **database PostgreSQL do Render tạo**, không phải database local. Chờ database Render ở trạng thái sẵn sàng, mở database trên Render, sao chép **External Database URL** và dùng từ máy tin cậy có kết nối Internet.
+
+Tại PowerShell mở ở thư mục `backend/`, nhập URL ẩn bằng `Read-Host` rồi chạy:
+
+```powershell
+$secureUrl = Read-Host "Render External Database URL" -AsSecureString
+$pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureUrl)
+
+try {
+    $env:DATABASE_URL = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)
+    $env:DB_SSL = "true"
+    npm run migrate
+}
+finally {
+    Remove-Item Env:DATABASE_URL, Env:DB_SSL -ErrorAction SilentlyContinue
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
+    $secureUrl.Dispose()
+}
+```
+
+Kết quả mong đợi kết thúc bằng `Migration complete.` và áp dụng migration chưa có (trong đó có migration tạo `task_documents` và `task_completion_reports`). Nếu báo lỗi kết nối, kiểm tra External Database URL, database còn hoạt động và kết nối SSL; không thay URL local trong `backend/.env`. Nếu migration báo constraint hoặc SQL error, dừng deploy tính năng đó và xử lý lỗi trước khi dùng API.
+
+**Mỗi khi thêm migration mới trong các lần cập nhật sau:** push đúng commit, chạy migration từ commit đó trên database Render trước, sau đó mới cho API deploy commit đó. Không chạy migration production bằng database local hoặc database test.
+
+### Bước 5: Tạo tài khoản quản trị viên đầu tiên
+
+Sau khi migration Render hoàn tất, vẫn ở `backend/`, dùng lại External Database URL (nhập ẩn như bước trước) và cung cấp email, tên admin cùng mật khẩu. Ví dụ chạy trong một khối để luôn xóa biến tạm:
+
+```powershell
+$secureUrl = Read-Host "Render External Database URL" -AsSecureString
+$urlPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureUrl)
+$securePassword = Read-Host "Mat khau admin (8-72 byte UTF-8)" -AsSecureString
+$passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+
+try {
+    $env:DATABASE_URL = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($urlPointer)
+    $env:DB_SSL = "true"
+    $env:ADMIN_EMAIL = Read-Host "Email admin"
+    $env:ADMIN_NAME = Read-Host "Ten admin"
+    $env:ADMIN_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
+    npm run seed:admin
+}
+finally {
+    Remove-Item Env:DATABASE_URL, Env:DB_SSL, Env:ADMIN_EMAIL, Env:ADMIN_NAME, Env:ADMIN_PASSWORD -ErrorAction SilentlyContinue
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($urlPointer)
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
+    $secureUrl.Dispose()
+    $securePassword.Dispose()
+}
+```
+
+Không gửi mật khẩu admin cho người khác. Nếu lệnh báo email đã tồn tại, seed không đổi tài khoản hiện có; hãy thử đăng nhập bằng tài khoản đó hoặc xác minh quyền quản trị với người quản lý database.
+
+### Bước 6: Kiểm tra website và API sau deploy
+
+1. Mở URL công khai của `taskflow-api` trong Render và thêm `/api/health`, ví dụ `https://taskflow-api.onrender.com/api/health`. Kết quả phải báo thành công và database khỏe mạnh.
+2. Mở URL của `taskflow-web` trong Render, đăng nhập bằng tài khoản admin đã tạo.
+3. Đăng ký một tài khoản nhân viên thử nghiệm bằng web, đăng nhập admin, vào **Team** để xác nhận thành viên hiển thị.
+4. Tạo task kèm một file PDF nhỏ, giao task cho tài khoản nhân viên; đăng nhập nhân viên và xác nhận tài liệu mở/tải được.
+5. Chuyển assignment từ **Todo** sang **In progress**, rồi **Completed** kèm ghi chú và một file báo cáo. Xác nhận báo cáo xuất hiện và có thể mở/tải.
+6. Nếu web báo lỗi CORS hoặc không kết nối API, kiểm tra log dịch vụ API, `WEB_ORIGIN`, `VITE_API_URL` và địa chỉ public của hai dịch vụ. Blueprint tự liên kết hai host; sau khi sửa environment, redeploy/restart dịch vụ tương ứng.
+7. Sau khi xác nhận, xóa/vô hiệu hóa tài khoản thử nghiệm và kiểm tra quota database/storage.
+
+### Cập nhật phiên bản đã deploy
+
+Khi push commit mới lên nhánh được Render theo dõi, Render có thể tự deploy. Nếu commit có migration mới, tạm dừng auto-deploy (nếu đang bật), chạy migration đúng commit trên PostgreSQL Render, rồi triển khai commit đó. Dùng migration tương thích ngược để tránh API mới chạy trước schema mới hoặc ngược lại. Không chỉnh sửa/xóa migration đã được áp dụng trên production để “chạy lại”; tạo migration mới cho thay đổi tiếp theo.
+
+### Triển khai ứng dụng di động (tùy chọn)
+
+Render Blueprint không build hoặc phát hành ứng dụng di động. Để export/build riêng, dùng HTTPS URL của API Render làm `EXPO_PUBLIC_API_URL` khi chạy Expo/EAS; không đặt database URL, JWT secret, admin password hay Supabase service-role key trong app. Việc export JS bundle chỉ kiểm tra bundling, chưa thay thế kiểm thử trên thiết bị thật.
+
+## 7. Quyền truy cập cần nhớ
 
 - Nhân viên chỉ xem công việc do mình tạo hoặc đang được giao; quyền truy cập được kiểm tra ở máy chủ.
 - Nhân viên không thể tự tạo tài khoản quản trị viên và không thể giao công việc cho người khác.
 - Tài khoản bị vô hiệu hóa không thể tiếp tục sử dụng hệ thống.
 - Nếu không thấy nút hoặc trang nào đó, có thể thao tác đó chỉ dành cho quản trị viên hoặc tài khoản chưa có quyền xem công việc.
 
-## 7. Khi gặp sự cố
+## 8. Khi gặp sự cố
 
 | Hiện tượng                                  | Việc nên kiểm tra                                                                                                                                                         |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -232,10 +384,13 @@ Mở **Team** để tìm thành viên theo tên/email hoặc lọc tài khoản 
 | Đăng nhập được nhưng không thấy công việc   | Thử xóa bộ lọc; nhân viên chỉ thấy công việc do mình tạo hoặc được giao.                                                                                                  |
 | Không tạo được tài khoản admin qua Register | Đây là thiết kế của hệ thống; admin phải được tạo bằng lệnh `npm run seed:admin`.                                                                                         |
 | Không tải lên được tài liệu hoặc báo cáo | Kiểm tra ba biến `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, bucket riêng tư đã tồn tại, quota còn đủ và file đúng loại/kích thước. |
+| Render API báo thiếu bảng `task_documents` hoặc `task_completion_reports` | Chạy `npm run migrate` tại `backend/` với `DATABASE_URL` là External Database URL của Render và `DB_SSL=true`; không dùng database local. |
+| Render API không truy cập được database | Kiểm tra database Render còn hoạt động, URL external đúng, SSL bật và database/service ở cùng vùng nếu nhà cung cấp yêu cầu. |
+| API trên Render báo thiếu cấu hình file storage | Kiểm tra `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` trên đúng API service; xác nhận bucket `taskflow-files` tồn tại và private. Lưu environment để Render restart API. |
 
 Nếu vẫn chưa xử lý được, ghi lại thông báo lỗi, thao tác vừa thực hiện và môi trường đang dùng (web/mobile); không gửi mật khẩu, token, hoặc nội dung file `.env`.
 
-## 8. Tài liệu tham khảo
+## 9. Tài liệu tham khảo
 
 - [README dự án](../README.md): kiến trúc, thiết lập và lệnh chạy/kiểm tra.
 - [Tài liệu API](./api.md): danh sách endpoint dành cho tích hợp hoặc kiểm thử API.
