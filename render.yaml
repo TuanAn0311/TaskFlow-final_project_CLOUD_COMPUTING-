@@ -3,7 +3,7 @@ databases:
     databaseName: taskflow
     user: taskflow
     plan: free
-    postgresVersion: "16"
+    postgresMajorVersion: "16"
 
 services:
   - type: web
