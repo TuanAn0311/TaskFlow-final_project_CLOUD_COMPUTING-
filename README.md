@@ -2,6 +2,8 @@
 
 TaskFlow là hệ thống quản lý công việc gồm backend REST API, ứng dụng web và ứng dụng di động. Backend dùng Node.js/Express và PostgreSQL; web dùng React/Vite; mobile dùng Expo/React Native.
 
+> Người mới sử dụng có thể xem [Hướng dẫn sử dụng TaskFlow bằng tiếng Việt](docs/huong-dan-su-dung.md) để cài đặt, chạy ứng dụng và thực hiện các thao tác thường gặp.
+
 ## Chức năng hiện có
 
 - Đăng ký tài khoản nhân viên, đăng nhập và lấy thông tin tài khoản hiện tại. Mật khẩu được băm bằng bcrypt; API dùng JWT để xác thực.
@@ -46,6 +48,7 @@ cloud-project/
 │   ├── api.md             Danh sách endpoint và quy ước API
 │   ├── architecture.md    Kiến trúc và mô hình dữ liệu
 │   ├── testing-deployment.md  Cách kiểm thử và triển khai
+│   ├── huong-dan-su-dung.md  Hướng dẫn cài đặt và sử dụng bằng tiếng Việt
 │   ├── testing.md            Kết quả kiểm thử audit và giới hạn đã xác minh
 │   ├── audit-report.md       Báo cáo rà soát dự án
 │   └── bug-fix-log.md       Nhật ký lỗi đã sửa và cách xác minh
