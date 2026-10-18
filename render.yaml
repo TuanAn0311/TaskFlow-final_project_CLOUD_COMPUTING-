@@ -1,5 +1,5 @@
 databases:
-  - name: taskflow-db
+  - name: taskflow-db-sg
     databaseName: taskflow
     user: taskflow
     plan: free
