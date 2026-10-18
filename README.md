@@ -10,6 +10,7 @@ TaskFlow là hệ thống quản lý công việc gồm backend REST API, ứng 
 - Phân quyền `admin` và `employee`. Nhân viên chỉ xem task do mình tạo hoặc đang được giao; quyền được kiểm tra ở backend.
 - Tạo, xem, tìm kiếm/lọc, chỉnh sửa và xóa mềm task; task có mức ưu tiên, hạn hoàn thành và trạng thái tổng hợp từ các phân công.
 - Giao task cho nhiều thành viên, thu hồi phân công, chuyển trạng thái công việc và lưu lịch sử trạng thái.
+- Đính kèm tài liệu dùng chung cho task; lưu ghi chú và file báo cáo riêng theo từng người/lần hoàn thành, xem hoặc tải qua liên kết có thời hạn.
 - Xem, thêm, sửa và xóa mềm bình luận theo quyền truy cập task.
 - Quản trị viên xem/tìm kiếm/lọc danh sách thành viên và kích hoạt hoặc vô hiệu hóa tài khoản; không thể tự vô hiệu hóa hoặc vô hiệu hóa quản trị viên đang hoạt động cuối cùng.
 - Web có dashboard, danh sách/phân trang task và thành viên, bộ lọc task/thành viên và giao diện chi tiết task.
@@ -25,6 +26,7 @@ cloud-project/
 │   │   ├── controllers/   Nhận request, gọi database layer, trả response
 │   │   ├── database/      Kết nối PostgreSQL và repository/truy vấn dữ liệu
 │   │   ├── middlewares/   Xác thực JWT, phân quyền, validation, xử lý lỗi
+│   │   ├── services/      Tích hợp dịch vụ lưu file dùng chung
 │   │   └── utils/         Lỗi dùng chung, logger và định dạng response
 │   ├── __tests__/         Integration tests cho API
 │   ├── .env.example       Mẫu cấu hình backend; không chứa cấu hình bí mật thật

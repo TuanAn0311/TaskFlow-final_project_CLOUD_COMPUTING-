@@ -34,3 +34,30 @@ export async function requestJson(path, { token, method = 'GET', body } = {}) {
   }
   return { response, data };
 }
+
+export async function requestFiles(path, { token, files } = {}) {
+  if (!API_URL) {
+    throw new Error('VITE_API_URL must be configured for the production web build.');
+  }
+
+  const formData = new FormData();
+  files.forEach((file) => formData.append('files', file));
+  let response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers: token ? { Authorization: 'Bearer ' + token } : {},
+      body: formData,
+    });
+  } catch {
+    throw new Error(`Cannot connect to the API at ${API_URL}. Check the API URL and network connection.`);
+  }
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error('The API returned an invalid response.');
+  }
+  return { response, data };
+}

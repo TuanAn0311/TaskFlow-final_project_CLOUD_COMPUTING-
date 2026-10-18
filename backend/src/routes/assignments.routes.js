@@ -5,6 +5,8 @@ const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const validate = require('../middlewares/validate');
 const assignmentsController = require('../controllers/assignments.controller');
+const documentsController = require('../controllers/documents.controller');
+const uploadFiles = require('../middlewares/uploadFiles');
 
 // mergeParams: true to access :id from parent tasks router
 const router = express.Router({ mergeParams: true });
@@ -30,9 +32,18 @@ router.patch(
     param('assignmentId').isInt({ min: 1 }).withMessage('Assignment id must be a positive integer'),
     body('status').isIn(['todo', 'in_progress', 'completed']).withMessage('Status must be todo, in_progress, or completed'),
     body('note').optional().isString().isLength({ max: 500 }),
+    body('completion_note').optional().isString().isLength({ max: 5000 }),
   ],
   validate,
   assignmentsController.updateAssignmentStatus
+);
+
+router.post(
+  '/:assignmentId/report/files',
+  param('assignmentId').isInt({ min: 1 }).withMessage('Assignment id must be a positive integer'),
+  validate,
+  uploadFiles,
+  documentsController.uploadReportFiles
 );
 
 router.patch(

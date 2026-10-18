@@ -26,6 +26,12 @@ services:
         fromDatabase:
           name: taskflow-db
           property: connectionString
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: taskflow-files
       - key: JWT_SECRET
         generateValue: true
       - key: WEB_ORIGIN

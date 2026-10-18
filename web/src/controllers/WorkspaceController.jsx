@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { requestJson } from "../models/apiModel.js";
+import { requestFiles, requestJson } from "../models/apiModel.js";
 import { defaultAuthForm, defaultTaskForm } from "../constants/forms.js";
 import { taskStatuses } from "../constants/tasks.js";
 import WorkspaceView from "../features/workspace/WorkspaceView.jsx";
@@ -16,6 +16,8 @@ export default function App() {
     const [assignments, setAssignments] = useState([]);
     const [history, setHistory] = useState([]);
     const [comments, setComments] = useState([]);
+    const [taskDocuments, setTaskDocuments] = useState([]);
+    const [completionReports, setCompletionReports] = useState([]);
     const [commentText, setCommentText] = useState("");
     const [editingCommentId, setEditingCommentId] = useState(null);
     const [editingCommentText, setEditingCommentText] = useState("");
@@ -28,6 +30,7 @@ export default function App() {
     const [isRegistering, setIsRegistering] = useState(false);
     const [authForm, setAuthForm] = useState(defaultAuthForm);
     const [taskForm, setTaskForm] = useState(defaultTaskForm);
+    const [taskFiles, setTaskFiles] = useState([]);
     const [taskFilters, setTaskFilters] = useState({
         status: "all",
         priority: "all",
@@ -114,6 +117,8 @@ export default function App() {
                 `/api/tasks/${task.id}/assignments`,
                 `/api/tasks/${task.id}/history`,
                 `/api/tasks/${task.id}/comments?page=1&limit=100`,
+                `/api/tasks/${task.id}/documents`,
+                `/api/tasks/${task.id}/reports`,
             ];
             const results = await Promise.all(paths.map((path) => requestJson(path, { token: authToken })));
             if (requestId !== taskDetailsRequestId.current) return;
@@ -126,6 +131,8 @@ export default function App() {
             setAssignments(Array.isArray(results[1].data.data) ? results[1].data.data : []);
             setHistory(Array.isArray(results[2].data.data) ? results[2].data.data : []);
             setComments(Array.isArray(results[3].data.data) ? results[3].data.data : []);
+            setTaskDocuments(Array.isArray(results[4].data.data) ? results[4].data.data : []);
+            setCompletionReports(Array.isArray(results[5].data.data) ? results[5].data.data : []);
         } finally {
             if (requestId === taskDetailsRequestId.current) setTaskDetailsLoading(false);
         }
@@ -136,6 +143,8 @@ export default function App() {
         setAssignments([]);
         setHistory([]);
         setComments([]);
+        setTaskDocuments([]);
+        setCompletionReports([]);
         setAssigneeIds([]);
         setCommentText("");
         setEditingCommentId(null);
@@ -305,8 +314,19 @@ export default function App() {
                 throw new Error(data.message || "Could not create task");
             }
 
+            let documentUploadError = "";
+            if (taskFiles.length > 0) {
+                try {
+                    const upload = await requestFiles(`/api/tasks/${data.data.id}/documents`, { token, files: taskFiles });
+                    if (!upload.response.ok) throw new Error(upload.data.message || "Could not upload task documents");
+                } catch (uploadError) {
+                    documentUploadError = uploadError.message;
+                }
+            }
             setTaskForm(defaultTaskForm);
-            setSuccess("Task created successfully.");
+            setTaskFiles([]);
+            setSuccess(documentUploadError ? "Task created, but some documents were not uploaded." : "Task and documents created successfully.");
+            if (documentUploadError) setError(`Task was created. Open it from Tasks to retry document upload. ${documentUploadError}`);
             const resetPage = taskPage !== 1;
             setTaskPage(1);
             await Promise.all([
@@ -367,19 +387,89 @@ export default function App() {
         }
     };
 
-    const handleUpdateAssignment = async (assignment, nextStatus) => {
+    const handleUpdateAssignment = async (assignment, nextStatus, completionNote = "", reportFiles = []) => {
         setLoading(true);
         setError("");
         setSuccess("");
         try {
-            const { response, data } = await requestJson(`/api/tasks/${selectedTask.id}/assignments/${assignment.id}/status`, { token, method: "PATCH", body: { status: nextStatus } });
+            const { response, data } = await requestJson(`/api/tasks/${selectedTask.id}/assignments/${assignment.id}/status`, {
+                token,
+                method: "PATCH",
+                body: { status: nextStatus, ...(nextStatus === "completed" ? { completion_note: completionNote.trim() } : {}) },
+            });
             if (!response.ok) throw new Error(data.message || "Could not update assignment");
-            setSuccess(`Assignment moved to ${nextStatus.replace("_", " ")}.`);
+            let reportUploadError = "";
+            if (nextStatus === "completed" && reportFiles.length > 0) {
+                try {
+                    const upload = await requestFiles(`/api/tasks/${selectedTask.id}/assignments/${assignment.id}/report/files`, { token, files: reportFiles });
+                    if (!upload.response.ok) throw new Error(upload.data.message || "Could not upload completion report files");
+                } catch (uploadError) {
+                    reportUploadError = uploadError.message;
+                }
+            }
             await Promise.all([loadTaskDetails(selectedTask), refreshTaskData(token)]);
+            if (reportUploadError) {
+                setError(`Status was updated to completed, but report files were not uploaded. Use the report section to retry. ${reportUploadError}`);
+                return true;
+            }
+            setSuccess(`Assignment moved to ${nextStatus.replace("_", " ")}.`);
+            return true;
+        } catch (err) {
+            setError(err.message);
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUploadTaskDocuments = async (files) => {
+        if (!selectedTask || files.length === 0) return;
+        setLoading(true);
+        setError("");
+        setSuccess("");
+        try {
+            const { response, data } = await requestFiles(`/api/tasks/${selectedTask.id}/documents`, { token, files });
+            if (!response.ok) throw new Error(data.message || "Could not upload task documents");
+            await loadTaskDetails(selectedTask);
+            setSuccess("Task documents uploaded.");
         } catch (err) {
             setError(err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleUploadReportFiles = async (assignmentId, files) => {
+        if (!selectedTask || files.length === 0) return;
+        setLoading(true);
+        setError("");
+        setSuccess("");
+        try {
+            const { response, data } = await requestFiles(`/api/tasks/${selectedTask.id}/assignments/${assignmentId}/report/files`, { token, files });
+            if (!response.ok) throw new Error(data.message || "Could not upload completion report files");
+            await loadTaskDetails(selectedTask);
+            setSuccess("Completion report files uploaded.");
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleOpenDocument = async (path, disposition) => {
+        const fileTab = window.open("about:blank", "_blank");
+        if (!fileTab) {
+            setError("Allow pop-ups for this site to open files in a new tab.");
+            return;
+        }
+        fileTab.opener = null;
+        try {
+            const { response, data } = await requestJson(`${path}?disposition=${disposition}`, { token });
+            if (!response.ok) throw new Error(data.message || "Could not open file");
+            fileTab.location.href = data.data.url;
+        } catch (err) {
+            fileTab.close();
+            setError(err.message);
         }
     };
 
@@ -526,11 +616,14 @@ export default function App() {
         setAssignments([]);
         setHistory([]);
         setComments([]);
+        setTaskDocuments([]);
+        setCompletionReports([]);
         setTaskEdit(null);
         setTaskPagination(null);
         setTeamPagination(null);
         setTaskSummary({ todo: 0, in_progress: 0, completed: 0, unassigned: 0 });
         setTaskForm(defaultTaskForm);
+        setTaskFiles([]);
         setAssigneeIds([]);
         setCommentText("");
         setEditingCommentId(null);
@@ -561,6 +654,9 @@ export default function App() {
             handleSaveComment={handleSaveComment}
             handleToggleUserStatus={handleToggleUserStatus}
             handleUpdateAssignment={handleUpdateAssignment}
+            handleUploadTaskDocuments={handleUploadTaskDocuments}
+            handleUploadReportFiles={handleUploadReportFiles}
+            handleOpenDocument={handleOpenDocument}
             handleUpdateTask={handleUpdateTask}
             history={history}
             isRegistering={isRegistering}
@@ -574,6 +670,8 @@ export default function App() {
             onChangeTaskEdit={setTaskEdit}
             onChangeTaskFilters={updateTaskFilters}
             onChangeTaskForm={setTaskForm}
+            taskFiles={taskFiles}
+            onChangeTaskFiles={setTaskFiles}
             onChangeTeamSearch={(search) => updateTeamFilters({ search })}
             onChangeTeamStatus={(status) => updateTeamFilters({ status })}
             onLogout={handleLogout}
@@ -590,6 +688,8 @@ export default function App() {
             pageDataTeam={teamPagination}
             searchTeam={teamSearch}
             selectedTask={selectedTask}
+            taskDocuments={taskDocuments}
+            completionReports={completionReports}
             setEditingCommentId={setEditingCommentId}
             statusFilterTeam={teamStatusFilter}
             success={success}

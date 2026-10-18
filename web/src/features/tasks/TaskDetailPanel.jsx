@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function TaskDetailPanel({
   assignments,
   assigneeIds,
@@ -14,6 +16,9 @@ export default function TaskDetailPanel({
   handleSaveComment,
   handleUpdateAssignment,
   handleUpdateTask,
+  handleUploadTaskDocuments,
+  handleUploadReportFiles,
+  handleOpenDocument,
   history,
   loading,
   onAssigneeIdsChange,
@@ -22,11 +27,17 @@ export default function TaskDetailPanel({
   onTaskEditChange,
   onBack,
   selectedTask,
+  taskDocuments,
+  completionReports,
   setEditingCommentId,
   taskEdit,
   team,
   user,
 }) {
+  const [completionAssignmentId, setCompletionAssignmentId] = useState(null);
+  const [completionNote, setCompletionNote] = useState('');
+  const [completionFiles, setCompletionFiles] = useState([]);
+
   if (!selectedTask || !taskEdit) return null;
 
   const canEditTask = user.role === 'admin' || String(selectedTask.created_by) === String(user.id);
@@ -94,6 +105,44 @@ export default function TaskDetailPanel({
         )}
       </div>
 
+      <div className="panel wide-panel">
+        <h3>Task documents</h3>
+        {canEditTask && (
+          <label>
+            Add documents
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg"
+              disabled={loading}
+              onChange={(event) => {
+                const files = Array.from(event.target.files || []);
+                event.target.value = '';
+                handleUploadTaskDocuments(files);
+              }}
+            />
+          </label>
+        )}
+        {taskDocuments.length === 0
+          ? <p className="empty-state">No task documents have been added.</p>
+          : taskDocuments.map((document) => (
+            <article className="member-card" key={document.id}>
+              <div>
+                <strong>{document.original_filename}</strong>
+                <small>{(Number(document.file_size) / 1024 / 1024).toFixed(2)} MB</small>
+              </div>
+              <div className="action-row compact-actions">
+                <button type="button" className="secondary-action" onClick={() => handleOpenDocument(
+                  `/api/tasks/${selectedTask.id}/documents/${document.id}/url`, 'inline',
+                )}>View</button>
+                <button type="button" className="secondary-action" onClick={() => handleOpenDocument(
+                  `/api/tasks/${selectedTask.id}/documents/${document.id}/url`, 'attachment',
+                )}>Download</button>
+              </div>
+            </article>
+          ))}
+      </div>
+
       <div className="panel">
         <h3>Assignments</h3>
         {detailsLoading && <p className="muted" role="status">Loading task details...</p>}
@@ -137,21 +186,57 @@ export default function TaskDetailPanel({
               <div className="action-row compact-actions">
                 {assignment.assignment_status === 'active'
                   && (user.role === 'admin' || String(assignment.user_id) === String(user.id)) && (
-                  <button
-                    type="button"
-                    className="secondary-action"
-                    disabled={loading}
-                    onClick={() => handleUpdateAssignment(
-                      assignment,
-                      assignment.status === 'todo'
-                        ? 'in_progress'
-                        : assignment.status === 'in_progress' ? 'completed' : 'in_progress',
-                    )}
-                  >
-                    {assignment.status === 'todo'
-                      ? 'Start'
-                      : assignment.status === 'in_progress' ? 'Complete' : 'Reopen'}
-                  </button>
+                  assignment.status === 'in_progress' && completionAssignmentId === assignment.id ? (
+                    <form className="task-form" onSubmit={(event) => {
+                      event.preventDefault();
+                      handleUpdateAssignment(assignment, 'completed', completionNote, completionFiles).then((updated) => {
+                        if (!updated) return;
+                        setCompletionAssignmentId(null);
+                        setCompletionNote('');
+                        setCompletionFiles([]);
+                      });
+                    }}>
+                      <label>
+                        Completion note (optional)
+                        <textarea
+                          rows="3"
+                          maxLength={5000}
+                          value={completionNote}
+                          onChange={(event) => setCompletionNote(event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Report files (optional)
+                        <input
+                          type="file"
+                          multiple
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg"
+                          onChange={(event) => setCompletionFiles(Array.from(event.target.files || []))}
+                        />
+                      </label>
+                      <div className="action-row">
+                        <button type="submit" className="primary-action" disabled={loading}>Confirm completion</button>
+                        <button type="button" className="secondary-action" onClick={() => setCompletionAssignmentId(null)}>Cancel</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <button
+                      type="button"
+                      className="secondary-action"
+                      disabled={loading}
+                      onClick={() => {
+                        if (assignment.status === 'in_progress') {
+                          setCompletionAssignmentId(assignment.id);
+                          setCompletionNote('');
+                          setCompletionFiles([]);
+                        } else {
+                          handleUpdateAssignment(assignment, 'in_progress');
+                        }
+                      }}
+                    >
+                      {assignment.status === 'todo' ? 'Start' : assignment.status === 'in_progress' ? 'Complete' : 'Reopen'}
+                    </button>
+                  )
                 )}
                 {user.role === 'admin' && assignment.assignment_status === 'active' && (
                   <button
@@ -167,6 +252,56 @@ export default function TaskDetailPanel({
             </article>
           ))}
         </div>
+      </div>
+
+      <div className="panel wide-panel">
+        <h3>Completion reports</h3>
+        {completionReports.length === 0
+          ? <p className="empty-state">No completion reports have been submitted.</p>
+          : completionReports.map((report) => {
+            const assignment = assignments.find((item) => String(item.id) === String(report.assignment_id));
+            const latestReportId = completionReports.find((item) => String(item.assignment_id) === String(report.assignment_id))?.id;
+            const canAddFiles = String(report.id) === String(latestReportId)
+              && assignment?.status === 'completed'
+              && assignment.assignment_status === 'active'
+              && (user.role === 'admin' || String(report.assignee_id) === String(user.id));
+            return (
+              <article className="member-card report-card" key={report.id}>
+                <div>
+                  <strong>{report.assignee_name} · {new Date(report.created_at).toLocaleString()}</strong>
+                  <small>Reported by {report.submitted_by_name}</small>
+                  {report.note && <p>{report.note}</p>}
+                  {report.files.map((file) => (
+                    <div className="action-row compact-actions" key={file.id}>
+                      <span>{file.original_filename}</span>
+                      <button type="button" className="secondary-action" onClick={() => handleOpenDocument(
+                        `/api/tasks/${selectedTask.id}/reports/${report.id}/documents/${file.id}/url`, 'inline',
+                      )}>View</button>
+                      <button type="button" className="secondary-action" onClick={() => handleOpenDocument(
+                        `/api/tasks/${selectedTask.id}/reports/${report.id}/documents/${file.id}/url`, 'attachment',
+                      )}>Download</button>
+                    </div>
+                  ))}
+                  {canAddFiles && (
+                    <label>
+                      Add report files
+                      <input
+                        type="file"
+                        multiple
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg"
+                        disabled={loading}
+                        onChange={(event) => {
+                          const files = Array.from(event.target.files || []);
+                          event.target.value = '';
+                          handleUploadReportFiles(report.assignment_id, files);
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </article>
+            );
+          })}
       </div>
 
       <div className="panel">

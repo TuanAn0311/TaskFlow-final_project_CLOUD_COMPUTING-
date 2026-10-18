@@ -33,8 +33,16 @@ async function updateAssignmentStatus(req, res, next) {
   try {
     const taskId = parseInt(req.params.id);
     const assignmentId = parseInt(req.params.assignmentId);
-    const { status, note } = req.body;
-    const result = await assignmentsRepository.updateAssignmentStatus(taskId, assignmentId, status, req.user.id, note, req.user);
+    const { status, note, completion_note } = req.body;
+    const result = await assignmentsRepository.updateAssignmentStatus(
+      taskId,
+      assignmentId,
+      status,
+      req.user.id,
+      note,
+      completion_note,
+      req.user
+    );
     return success(res, result, 'Assignment status updated');
   } catch (err) { next(err); }
 }

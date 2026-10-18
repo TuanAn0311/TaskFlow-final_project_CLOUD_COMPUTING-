@@ -53,6 +53,24 @@ WEB_ORIGIN=http://localhost:5173
 
 Giữ nguyên các thiết lập khác trong file mẫu nếu bạn chưa biết cần thay đổi gì. Không gửi file `.env` hoặc mật khẩu cho người khác, và không đưa các giá trị bí mật lên Git.
 
+### Bật chức năng tải tài liệu và báo cáo
+
+TaskFlow lưu file trong một **bucket riêng tư của Supabase Storage**; không cần mở bucket công khai. Để bật chức năng này:
+
+1. Tạo project Supabase của riêng bạn và tạo bucket tên `taskflow-files` trong **Storage**. Để bucket ở chế độ **Private**.
+2. Trong phần cấu hình/API của Supabase, lấy **Project URL** và **service_role key**. Chỉ backend được giữ service role key; tuyệt đối không đưa key này vào web/mobile, Git hoặc tài liệu công khai.
+3. Điền ba giá trị sau vào `backend/.env`:
+
+   ```dotenv
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your-private-service-role-key
+   SUPABASE_STORAGE_BUCKET=taskflow-files
+   ```
+
+4. Chạy migration ở bước tiếp theo rồi khởi động lại backend. Khi deploy theo Render Blueprint, nhập `SUPABASE_URL` và `SUPABASE_SERVICE_ROLE_KEY` vào phần biến môi trường của API; bucket `taskflow-files` phải được tạo trước.
+
+Gói miễn phí của nhà cung cấp có giới hạn và điều kiện riêng, có thể thay đổi; kiểm tra quota, giới hạn kích thước và chính sách lưu trữ hiện hành trong Supabase trước khi dùng cho dữ liệu quan trọng. File hỗ trợ: PDF, Word, Excel, PowerPoint, TXT, PNG và JPG; tối đa 10 MB/file, tối đa 5 file mỗi lần tải lên. File được mở bằng đường dẫn có chữ ký, hết hạn sau 2 phút.
+
 ### Bước 2: Cài backend và tạo cấu trúc bảng
 
 Vẫn ở thư mục `backend`, chạy:
@@ -150,6 +168,10 @@ Giao diện hiện dùng một số nhãn tiếng Anh. Bảng dưới giải th�
 
 Nhân viên tạo công việc sẽ tự động được giao vào công việc đó. Quản trị viên có thể giao công việc cho thành viên sau khi tạo.
 
+Khi tạo công việc, có thể chọn tài liệu đính kèm trước khi nhấn **Create task**. Sau đó người có quyền xem công việc có thể mở tài liệu trong tab mới hoặc tải xuống. Nếu tải file thất bại, công việc vẫn được tạo; mở chi tiết công việc để thử tải lại.
+
+PDF, ảnh và TXT thường được trình duyệt mở trực tiếp; khả năng xem trước các định dạng Office tùy trình duyệt/thiết bị. Nếu trình duyệt không xem trước được, dùng **Download** để mở bằng ứng dụng phù hợp.
+
 ### Tìm và lọc công việc
 
 Mở **Tasks** để xem danh sách. Có thể tìm theo tiêu đề/mô tả, lọc theo trạng thái, mức ưu tiên và khoảng hạn hoàn thành. Quản trị viên có thêm bộ lọc người được giao và người tạo. Nếu có nhiều kết quả, dùng điều khiển phân trang ở cuối danh sách.
@@ -172,6 +194,10 @@ Trong mục **Assignments**, người được giao hoặc quản trị viên c�
 - **Todo** → nhấn **Start** để chuyển sang **In progress**.
 - **In progress** → nhấn **Complete** để chuyển sang **Completed**.
 - **Completed** → nhấn **Reopen** để quay lại **In progress** nếu cần làm tiếp.
+
+Khi nhấn **Complete**, có thể nhập ghi chú và chọn file báo cáo (cả hai đều không bắt buộc). Báo cáo được lưu riêng theo từng người và từng lần hoàn thành. Nếu trạng thái đã chuyển sang **Completed** nhưng file báo cáo tải lên thất bại, mở mục **Completion reports** và chọn **Add report files** để thử lại.
+
+PDF, ảnh và TXT thường xem trực tiếp được trong tab mới; các định dạng Office phụ thuộc khả năng của trình duyệt/thiết bị và có thể cần tải xuống để mở.
 
 Trạng thái hiển thị trên danh sách công việc là trạng thái tổng hợp từ các phân công; mỗi thành viên có trạng thái riêng trong phần **Assignments**. Các thay đổi được ghi nhận trong **Status history**.
 
@@ -205,6 +231,7 @@ Mở **Team** để tìm thành viên theo tên/email hoặc lọc tài khoản 
 | Điện thoại không kết nối được               | Dùng IP LAN của máy tính, cho phép kết nối qua firewall nếu cần, và bảo đảm hai thiết bị cùng mạng. `localhost` trên điện thoại là chính điện thoại, không phải máy tính. |
 | Đăng nhập được nhưng không thấy công việc   | Thử xóa bộ lọc; nhân viên chỉ thấy công việc do mình tạo hoặc được giao.                                                                                                  |
 | Không tạo được tài khoản admin qua Register | Đây là thiết kế của hệ thống; admin phải được tạo bằng lệnh `npm run seed:admin`.                                                                                         |
+| Không tải lên được tài liệu hoặc báo cáo | Kiểm tra ba biến `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, bucket riêng tư đã tồn tại, quota còn đủ và file đúng loại/kích thước. |
 
 Nếu vẫn chưa xử lý được, ghi lại thông báo lỗi, thao tác vừa thực hiện và môi trường đang dùng (web/mobile); không gửi mật khẩu, token, hoặc nội dung file `.env`.
 

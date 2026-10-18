@@ -26,6 +26,9 @@ export default function WorkspaceView({
   handleToggleUserStatus,
   handleUpdateAssignment,
   handleUpdateTask,
+  handleUploadTaskDocuments,
+  handleUploadReportFiles,
+  handleOpenDocument,
   history,
   isRegistering,
   loading,
@@ -37,6 +40,7 @@ export default function WorkspaceView({
   onChangeTaskEdit,
   onChangeTaskFilters,
   onChangeTaskForm,
+  onChangeTaskFiles,
   onChangeTeamSearch,
   onChangeTeamStatus,
   onLogout,
@@ -49,6 +53,8 @@ export default function WorkspaceView({
   pageDataTeam,
   searchTeam,
   selectedTask,
+  taskDocuments,
+  completionReports,
   setEditingCommentId,
   statusFilterTeam,
   success,
@@ -56,6 +62,7 @@ export default function WorkspaceView({
   taskDetailsLoading,
   taskFilters,
   taskForm,
+  taskFiles,
   taskSummary,
   tasks,
   tasksLoading,
@@ -97,6 +104,8 @@ export default function WorkspaceView({
             form={taskForm}
             loading={loading}
             onChange={onChangeTaskForm}
+            files={taskFiles}
+            onFilesChange={onChangeTaskFiles}
             onSubmit={handleCreateTask}
           />
           <TaskCollection
@@ -130,6 +139,7 @@ export default function WorkspaceView({
 
       {activeTab === 'detail' && selectedTask && taskEdit && (
         <TaskDetailPanel
+          key={selectedTask.id}
           assignments={assignments}
           assigneeIds={assigneeIds}
           comments={comments}
@@ -144,6 +154,9 @@ export default function WorkspaceView({
           handleSaveComment={handleSaveComment}
           handleUpdateAssignment={handleUpdateAssignment}
           handleUpdateTask={handleUpdateTask}
+          handleUploadTaskDocuments={handleUploadTaskDocuments}
+          handleUploadReportFiles={handleUploadReportFiles}
+          handleOpenDocument={handleOpenDocument}
           history={history}
           loading={loading}
           onAssigneeIdsChange={onAssigneeIdsChange}
@@ -152,6 +165,8 @@ export default function WorkspaceView({
           onEditingCommentChange={onChangeEditingCommentText}
           onTaskEditChange={onChangeTaskEdit}
           selectedTask={selectedTask}
+          taskDocuments={taskDocuments}
+          completionReports={completionReports}
           setEditingCommentId={setEditingCommentId}
           detailsLoading={taskDetailsLoading}
           taskEdit={taskEdit}

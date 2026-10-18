@@ -54,7 +54,7 @@ function TaskCards({ tasks, onOpenTask }) {
   );
 }
 
-export function CreateTaskForm({ form, loading, onChange, onSubmit }) {
+export function CreateTaskForm({ form, files, loading, onChange, onFilesChange, onSubmit }) {
   return (
     <div className="panel">
       <h3>Create task</h3>
@@ -72,6 +72,16 @@ export function CreateTaskForm({ form, loading, onChange, onSubmit }) {
           onChange={(event) => onChange({ ...form, description: event.target.value })}
           placeholder="Task description"
         />
+        <label>
+          Task documents (optional)
+          <input
+            type="file"
+            multiple
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg"
+            onChange={(event) => onFilesChange(Array.from(event.target.files || []))}
+          />
+        </label>
+        {files.length > 0 && <small className="muted">{files.length} file(s) selected; maximum 5 files, 10 MB each.</small>}
         <div className="inline-fields">
           <select value={form.priority} onChange={(event) => onChange({ ...form, priority: event.target.value })}>
             <option value="low">Low</option>

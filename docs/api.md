@@ -30,6 +30,11 @@ Passwords must be at least eight UTF-8 bytes and no more than 72 UTF-8 bytes (th
 | `GET` | `/tasks/:id` | Admin, creator, or active assignee | Task detail |
 | `PATCH` | `/tasks/:id` | Admin or creator | Update `title`, `description`, `priority`, or `due_date` |
 | `DELETE` | `/tasks/:id` | Admin | Soft-delete task |
+| `GET` | `/tasks/:id/documents` | Task reader | List shared task documents |
+| `POST` | `/tasks/:id/documents` | Admin or task creator | Upload up to five `files` in multipart form data |
+| `GET` | `/tasks/:id/documents/:documentId/url?disposition=inline|attachment` | Task reader | Get a 2-minute signed view/download URL |
+| `GET` | `/tasks/:id/reports` | Task reader | List completion reports and report files |
+| `GET` | `/tasks/:id/reports/:reportId/documents/:documentId/url?disposition=inline|attachment` | Task reader | Get a 2-minute signed report view/download URL |
 
 Task date filters accept ISO 8601 values. A date-only `due_before` value includes the entire calendar day.
 
@@ -42,9 +47,12 @@ Valid priority values are `low`, `medium`, `high`; task statuses are `unassigned
 | `GET` | `/tasks/:id/assignments` | Task reader | Read active and revoked assignment history |
 | `POST` | `/tasks/:id/assignments` | Admin | Assign one or more active users (`assignee_ids: number[]`) |
 | `PATCH` | `/tasks/:id/assignments/:assignmentId/status` | Admin or assignment owner | Change status; optional `note` |
+| `POST` | `/tasks/:id/assignments/:assignmentId/report/files` | Admin or assignment owner, while completed | Upload up to five `files` to the latest completion report |
 | `PATCH` | `/tasks/:id/assignments/:assignmentId/revoke` | Admin | Revoke active assignment; optional `revoke_reason` |
 
-Allowed status transitions: `todo → in_progress`, `in_progress → todo|completed`, and `completed → in_progress`. Transitions and their history event are stored transactionally.
+Allowed status transitions: `todo → in_progress`, `in_progress → todo|completed`, and `completed → in_progress`. Transitions, their history event, and a new completion report are stored transactionally. On a transition to `completed`, the optional JSON field `completion_note` (up to 5,000 characters) is saved as a report; report files can be attached afterward.
+
+File uploads use multipart form data with the field name `files`. Up to five files, 10 MB each, are accepted in PDF, Word, Excel, PowerPoint, TXT, PNG, and JPG formats. Task documents are visible to users who can access that task. Completion reports are separate per completion cycle and assignment; files are private in storage and delivered using short-lived signed URLs.
 
 ## History and comments
 

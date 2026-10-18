@@ -132,7 +132,7 @@ async function revokeAssignment(taskId, assignmentId, revoked_by, revoke_reason,
   }
 }
 
-async function updateAssignmentStatus(taskId, assignmentId, newStatus, changed_by, note, user) {
+async function updateAssignmentStatus(taskId, assignmentId, newStatus, changed_by, note, completionNote, user) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -182,6 +182,13 @@ async function updateAssignmentStatus(taskId, assignmentId, newStatus, changed_b
        VALUES ($1, $2, $3, $4, $5)`,
       [assignmentId, changed_by, assignment.status, newStatus, note || null]
     );
+    if (newStatus === 'completed') {
+      await client.query(
+        `INSERT INTO task_completion_reports (task_id, assignment_id, submitted_by, note)
+         VALUES ($1, $2, $3, $4)`,
+        [taskId, assignmentId, changed_by, completionNote?.trim() || null]
+      );
+    }
     await client.query('COMMIT');
     return updatedRows[0];
   } catch (err) {
