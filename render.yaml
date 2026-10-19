@@ -12,9 +12,8 @@ services:
       runtime: node
       plan: free
       region: singapore
-      rootDir: backend
-      buildCommand: npm ci
-      startCommand: npm start
+      buildCommand: npm ci --prefix backend
+      startCommand: npm --prefix backend run migrate && npm --prefix backend start
       healthCheckPath: /api/health
       envVars:
           - key: NODE_ENV
