@@ -40,23 +40,9 @@ Remove-Item Env:EXPO_PUBLIC_API_URL
 
 An Expo export validates bundling; it does not replace testing on physical iOS/Android devices. Verify permissions, device networking, keyboard behavior, and secure token persistence on target devices.
 
-## Render Blueprint
+## Deploy lên Render
 
-The root `render.yaml` provisions a PostgreSQL 16 database, a Node API, and a static Vite site. Review the provider's pricing, supported region, and current free-tier persistence/expiry limitations before provisioning. Free database plans are not suitable for durable production data.
-
-Deployment sequence:
-
-1. Push the source repository to a remote Git provider and create a Render Blueprint from it.
-2. Review the three resources and apply the Blueprint. Render generates `JWT_SECRET` and connects the API to the database.
-3. After the Blueprint creates the database, run the migrations from a trusted local machine with access to the Render PostgreSQL external URL. In the `backend/` directory, provide that URL as `DATABASE_URL`, set `DB_SSL=true`, then run `npm run migrate`. Do not use the API until migrations finish. Before later deploys that introduce migrations, disable automatic deploys, run the migration from the matching source commit first, and then manually deploy that commit. Use backward-compatible migrations. Do not put the URL in source control, shell history, or logs; clear temporary environment variables afterward. The migration runner uses a PostgreSQL advisory lock and applies each migration transactionally. Render Free web services do not provide Dashboard Shell/SSH or pre-deploy commands.
-4. Confirm `/api/health` reports success after the database is migrated and the API is deployed.
-5. The static site gets the API host as `VITE_API_URL`; the API gets the static-site host as `WEB_ORIGIN`.
-6. Create a private Supabase Storage bucket (default name `taskflow-files`) and set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` on the API service. Keep the service-role key only in the API environment; never expose it to the browser or mobile bundle. Review the Supabase free-plan quota and retention limits.
-7. Create the initial administrator from the trusted local machine after migrations: set `DATABASE_URL` to the Render external URL, `DB_SSL=true`, and provide `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and optionally `ADMIN_NAME` as temporary environment variables, then run `npm run seed:admin` from `backend/`. Do not put credentials in source control, shell history, or logs; clear the temporary variables afterward. The seed is safe to rerun for an existing email and does not change that account.
-8. Configure a durable PostgreSQL plan and backups for real data. Do not use the development seed in production.
-9. For mobile, set `EXPO_PUBLIC_API_URL` to the deployed HTTPS API URL at build time. Build/distribute separately using Expo/EAS; do not embed JWT/database/admin secrets in the app.
-
-The Blueprint uses a Free API plan, so migrations must be run manually from a machine that can reach the database. Free Render Postgres is temporary (30-day lifetime) and has no backups; upgrade it before storing data that must be retained.
+Xem [hướng dẫn deploy Render](./deploy-render.md) để tạo tài nguyên, cấu hình Supabase, tạo tài khoản admin và kiểm tra website/API. Blueprint trong `render.yaml` chạy migration khi API khởi động.
 
 ## Release checklist
 
