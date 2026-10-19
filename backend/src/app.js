@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -10,32 +10,25 @@ const app = express();
 // Security headers
 app.use(helmet());
 
-if (process.env.TRUST_PROXY_HOPS !== undefined && process.env.TRUST_PROXY_HOPS !== '') {
+if (process.env.TRUST_PROXY_HOPS !== undefined && process.env.TRUST_PROXY_HOPS !== "") {
     const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS);
     if (!Number.isSafeInteger(trustProxyHops) || trustProxyHops < 0) {
-        throw new Error('TRUST_PROXY_HOPS must be a non-negative integer');
+        throw new Error("TRUST_PROXY_HOPS must be a non-negative integer");
     }
-    app.set('trust proxy', trustProxyHops);
+    app.set("trust proxy", trustProxyHops);
 }
 
 // Middleware
-const allowedOrigins = (process.env.WEB_ORIGIN || "")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean)
-    .map((origin) => {
-        if (/^https?:\/\//i.test(origin)) return new URL(origin).origin;
-        return `https://${origin}`;
-    });
+const allowedOrigins = ["https://taskflow-web-1t7e.onrender.com"];
 
-app.use(cors({
-    origin(origin, callback) {
-        if (!origin || (process.env.NODE_ENV !== "production" && allowedOrigins.length === 0)) {
-            return callback(null, true);
-        }
-        return callback(null, allowedOrigins.includes(origin));
-    },
-}));
+app.use(
+    cors({
+        origin: allowedOrigins,
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+    }),
+);
+
 app.use(express.json({ limit: "1mb" }));
 
 app.use("/api", apiRoutes);
